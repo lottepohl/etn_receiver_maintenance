@@ -54,7 +54,7 @@ BPNS <- mregions2::gaz_search(3293) %>% mregions2::gaz_geometry()
 ```{css, echo=FALSE}
 
 .small {
-  zoom: 75%;
+  zoom: 55%;
 
 ```
 
@@ -104,7 +104,8 @@ current_deployments <-
                      by = join_by(receiver_id)) %>%
     dplyr::mutate(across(where(is.POSIXct), ~ format(., "%Y-%m-%d")),
                   battery_estimated_life_months = battery_estimated_life %>% as.integer(),
-                  battery_estimated_life_months = (battery_estimated_life_months / 30) %>% round(digits = 0)
+                  battery_estimated_life_months = (battery_estimated_life_months / 30) %>% round(digits = 0),
+                  deployment_id = deployment_id %>% factor()
                   ) #change all date formats to show only year-month-day
 
 ```
@@ -149,6 +150,12 @@ current_deployments_3 <-
                   battery_estimated_end_date < Sys.Date(),
                   deploy_date_time > (Sys.Date() - lubridate::years(cutoff_year_closed_deployment))) # filter out deployments that are presumably closed or lost
 
+# Save all deployments that require manual check
+
+current_deployments_manual_check <- 
+  current_deployments %>%
+    dplyr::filter(!deployment_id %in% current_deployments_0$deployment_id)
+
 
   
 # quick and dirty algorithm
@@ -164,6 +171,7 @@ current_deployments <- current_deployments %>%
                                 '#00639E'),
                 colour = colour %>% tidyr::replace_na('#303030')) %>% 
   dplyr::arrange(desc(needs_battery_change))
+
 ```
 
 
@@ -211,8 +219,7 @@ flexdashboard::valueBox(num_deployments,
 
 ```{r deployments that need manual check}
 num_receivers_manualcheck <- 
-  current_deployments %>%
-    dplyr::filter(needs_battery_change %>% is.na()) %>%
+  current_deployments_manual_check %>%
     nrow()
 
 flexdashboard::gauge(value = num_receivers_manualcheck,
@@ -332,20 +339,8 @@ receiver_map
 
 # 2. Manual Check {#deploymentsQC}
 
-Row {data-height=100}
+Row {data-height=50}
 -------------------------------------
-
-### Deployments that need manual check {#deploymentsQC-vBox}
-
-<!-- todo: hrefs to tables -->
-
-```{r Deployments that need manual check}
-flexdashboard::valueBox(num_receivers_manualcheck,
-                        href = 'https://www.lifewatch.be/etn/login',
-                        caption = "currently active deployments <br>need a manual data check in the ETN portal, <br>divided into 3 categories",
-                        icon = "fa-circle-exclamation",
-                        color = 'lightgray')
-```
 
 ### *Category 1:* Receivers are **lost** or deployment is not active anymore {#deploymentsQC-gauge-lost}
 
@@ -398,11 +393,26 @@ flexdashboard::gauge(value = num_deployments_3,
                      abbreviateDecimals = 0)
 ```
 
+
+### Deployments that need manual check {#deploymentsQC-vBox}
+
+<!-- todo: hrefs to tables -->
+
+```{r Deployments that need manual check}
+flexdashboard::valueBox(num_receivers_manualcheck,
+                        href = 'https://www.lifewatch.be/etn/login',
+                        caption = "currently active deployments <br>need a manual data check in the ETN portal, <br>divided into 3 categories",
+                        icon = "fa-circle-exclamation",
+                        color = 'lightgray')
+```
   
-Row {.tabset .tabset-fade data-height=900}
+
+Row {.tabset .tabset-fade data-height=950}
 -------------------------------------
 
-###  *Category 1:* Lost receivers {#deploymentsQC-table-lost}
+<!-- new colours for the 3 categories: #BAD1C4, #97A9BF, and #CCB6B6 -->
+
+###  *Category 1:* Lost receivers or inactive deployment {#deploymentsQC-table-lost}
 
 For the following `r current_deployments_1 %>% nrow()` deployments, the `deploy_date_time` was more than `r cutoff_year_closed_deployment` years ago.
 
@@ -410,10 +420,10 @@ Advised action for the following `r current_deployments_1 %>% nrow()` deployment
 
 ```{r table QC1}
 DT::datatable(current_deployments_1 %>%
-              dplyr::select(deployment_id, status, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
-                             station_name, deploy_latitude, deploy_longitude, acoustic_project_code, receiver_id),
+              dplyr::select(deployment_id, receiver_id, status, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+                            comments, deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time, previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
-              filter = 'bottom', 
+              filter = 'top', 
               extension = 'Buttons',
               options = list(
                 dom = 'Bfrtip',
@@ -428,19 +438,18 @@ DT::datatable(current_deployments_1 %>%
 
 ```
 
-###  *Category 2:* No battery installation date {#deploymentsQC-table-noStart}
+###  *Category 2:* Battery installation date is empty or wrong {#deploymentsQC-table-noStart}
 
 For the following `r current_deployments_2 %>% nrow()` deployments, the `battery_installation_date` was either not set or lies in the future.
 
-Advised action: **Update the `battery_installation_date`** from the previous deployment, if given there. 
+Advised action: **Update** the `battery_installation_date` from the previous deployment, if given there. For `mooring_type == 'surface-buoy'`, the batteries do not get taken out when there is still some battery life left, and the batteries always get replaced with fresh ones.
 
 ```{r table QC2}
 DT::datatable(current_deployments_2 %>%
-              dplyr::select(deployment_id, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
-                             previous_battery_installation_date, previous_recover_date_time,
-                             station_name, deploy_latitude, deploy_longitude, acoustic_project_code, receiver_id, previous_deployment_id),
+              dplyr::select(deployment_id, receiver_id, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+                            comments, deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time, previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
-              filter = 'bottom', 
+              filter = 'top', 
               extension = 'Buttons',
               options = list(
                 dom = 'Bfrtip',
@@ -451,7 +460,7 @@ DT::datatable(current_deployments_2 %>%
               )
 ```
 
-###  *Category 3:* No battery estimated end date {#deploymentsQC-table-noEnd}
+###  *Category 3:* Battery estimated end date is empty or wrong {#deploymentsQC-table-noEnd}
 
 For the following `r current_deployments_3 %>% nrow()` deployments, the `battery_estimated_end_date` is missing or lies in the past.
 
@@ -459,11 +468,10 @@ Advised action: **Update the `battery_estimated_end_date`** according to the `ba
 
 ```{r table QC3}
 DT::datatable(current_deployments_3 %>%
-              dplyr::select(deployment_id, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
-                             previous_battery_installation_date, previous_recover_date_time,
-                             station_name, deploy_latitude, deploy_longitude, acoustic_project_code, receiver_id, previous_deployment_id),
+              dplyr::select(deployment_id, receiver_id, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+                            comments, deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time, previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
-              filter = 'bottom', 
+              filter = 'top', 
               extension = 'Buttons',
               options = list(
                 dom = 'Bfrtip',
@@ -494,8 +502,9 @@ DT::datatable(current_deployments_3 %>%
 ```{r receiver dt, include=TRUE, echo=FALSE}
 
 DT::datatable(current_deployments %>%
-              dplyr::select(receiver_id, needs_battery_change, station_name, deploy_latitude, deploy_longitude, 
-                             battery_installation_date, battery_estimated_end_date,  deploy_date_time, acoustic_project_code),
+              dplyr::select(deployment_id, receiver_id,, needs_battery_change, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+                            comments, deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time,
+                            previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
               filter = 'top', 
               extension = 'Buttons',
