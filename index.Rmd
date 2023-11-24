@@ -30,11 +30,9 @@ library(leaflet)# for interactive maps
 library(knitr) # for knitting the document into a e.g. .html file
 library(leafem) # for extras in leaflet maps
 library(DT) # for interactive tables
-options(DT.options = list(
+options(DT.options = list(scrollY="200px", #500
 
-                          scrollY="200px", #500
-
-                          scrollX="100px", #200
+                          scrollX="200px", #200
 
                           # pageLength = 5, 
 
@@ -51,14 +49,43 @@ BPNS <- mregions2::gaz_search(3293) %>% mregions2::gaz_geometry()
 
 ```
 
-```{css, echo=FALSE}
 
-.small {
-  zoom: 55%;
+<!-- ```{css, echo=FALSE} -->
 
-```
+<!-- .small { -->
+<!--   zoom: 55%; -->
+
+<!-- ``` -->
 
 
+<!-- <style type="text/css"> -->
+<!--   li {font-size: 10px;} -->
+<!-- </style> -->
+
+
+<!-- <style type="text/css"> -->
+<!--   body { -->
+<!--     font-size: 10px; -->
+<!--   } -->
+<!-- </style> -->
+
+<style type="text/css">
+  <!-- body { -->
+  <!--   font-size: 14px; -->
+  <!-- } -->
+
+  h1, h2, h3, h4, h5, h6 {
+    font-size: 10px; /* Adjust the size as needed */
+  }
+
+  .valueBox {
+    font-size: 8px; /* Adjust the size as needed */
+  }
+
+  .dataTable {
+    font-size: 13px; /* Adjust the size as needed */
+  }
+</style>
 
 
 ```{r query etn data, include=FALSE}
@@ -95,7 +122,7 @@ last_deployments <-
 current_deployments <- 
   current_deployments %>%
     dplyr::mutate(needs_battery_change = NA,
-                colour = "black") %>%
+                  colour = NA) %>%
     dplyr::select(!starts_with(c("ar", "log", "sync"))) %>%
     dplyr::left_join(current_receivers %>% # add information about the acoustic receivers into the deployment table
                      dplyr::select(!starts_with("ar")),
@@ -122,7 +149,17 @@ current_deployments <-
 # 3) have no battery installation date but a correct battery estimated end date (-> if battery_end_date existent & lies in future, take battery_end_date - 13 months)
 # 4) have a battery installation date that is in the future (-> check if battery_end_date is there & in the future: if not, set battery_installation_date as battery_estimated_end_date)
 # 5) have a battery estimated end date that is the same as the battery installation date, and lies in the past (-> set battery estimated end date as battery installation date + battery_lifetime_months)
+
+# set parameters
 cutoff_year_closed_deployment <- 2
+months_to_maintenance <- 3
+battery_ok_colour <- '#0066A2'
+needs_bat_change_colour <- '#F49630'
+needs_manual_check_colour <- '#303030'
+cat1_colour <- '#659F8D' # '#76A99A' # '#40675B' #'#C0AFD1'
+cat2_colour <- '#9A8EB2' #'#AAA0BF' # '#7C6D9C' #'#F0DFAD'
+cat3_colour <- '#AD8A45' #'#BA9751' #'#4C3D20' #'#C6E0FF'
+
 
 # QC check 0): all battery info entered correctly
 current_deployments_0 <- 
@@ -154,22 +191,30 @@ current_deployments_3 <-
 
 current_deployments_manual_check <- 
   current_deployments %>%
-    dplyr::filter(!deployment_id %in% current_deployments_0$deployment_id)
+    dplyr::filter(!deployment_id %in% current_deployments_0$deployment_id) %>%
+    dplyr::mutate(category = ifelse(deployment_id %in% current_deployments_1$deployment_id, 1,
+                                    ifelse(deployment_id %in% current_deployments_2$deployment_id, 2, 3)) %>%
+                    factor(),
+                  colour = ifelse(category == 1, cat1_colour,
+                                    ifelse(category == 2, cat2_colour, cat3_colour)))
 
 
   
 # quick and dirty algorithm
   
-cutoff_date <- Sys.Date() + months(3)
+cutoff_date <- Sys.Date() + months(months_to_maintenance)
   
 current_deployments <- current_deployments %>%
   dplyr::mutate(needs_battery_change = ifelse(battery_estimated_end_date < cutoff_date, 
                                               1, 
                                               0),
                 colour = ifelse(needs_battery_change == 1, 
-                                'orange',
-                                '#00639E'),
-                colour = colour %>% tidyr::replace_na('#303030')) %>% 
+                                needs_bat_change_colour,
+                                battery_ok_colour),
+                colour = colour %>% tidyr::replace_na(needs_manual_check_colour),
+                needs_battery_change = ifelse(needs_battery_change %>% is.na(), "manual check", needs_battery_change)) %>% 
+  # dplyr::mutate(needs_battery_change = needs_battery_change %>% tidyr::replace_na(2)) %>%
+  # dplyr::mutate( %>% #tidyr::replace_na(2)) %>%
   dplyr::arrange(desc(needs_battery_change))
 
 ```
@@ -177,7 +222,7 @@ current_deployments <- current_deployments %>%
 
 # 1. Overview {#overview}
 
-Row {data-height=100}
+Row {data-height=80}
 ------------------------------------
 
 ### {#etn-logo data-width=150}
@@ -212,7 +257,7 @@ num_deployments <- current_deployments %>% nrow()
 flexdashboard::valueBox(num_deployments,
                         caption = "receivers are currently deployed",
                         icon = "fa-anchor",
-                        color = 'lightgray')
+                        color = '#AAD3DF')
 ```
 
 ### deployments that need manual check {#gauge-receiversneedQC}
@@ -225,14 +270,14 @@ num_receivers_manualcheck <-
 flexdashboard::gauge(value = num_receivers_manualcheck,
                      href = '#deploymentsQC',
                      min = 0, max = num_deployments, 
-                     gaugeSectors(success = c(0, (num_deployments/3)), # show a warning color when 2/3 of currently active receivers need change soon
+                     gaugeSectors(success = c(0, (num_deployments/3)),
                                   warning = c((num_deployments/3), 2*(num_deployments/3)),
                                   danger = c(2*(num_deployments/3), num_deployments),
-                                  colors = c("grey", "darkgrey", "black")),
+                                  colors = c(needs_manual_check_colour, needs_manual_check_colour, needs_manual_check_colour)),
                      abbreviateDecimals = 0)
 ```
 
-### receivers requiring maintenance {#gauge-receiversMaintenance}
+### receivers that need new batteries {#gauge-receiversMaintenance}
 
 ```{r receivers requiring maintenance}
 num_receivers_batterychange <- 
@@ -244,15 +289,34 @@ num_receivers_batterychange <-
 flexdashboard::gauge(value = num_receivers_batterychange,
                      href = '#table-receiverInfo',
                      min = 0, max = num_deployments, 
-                     gaugeSectors(success = c(0, (num_deployments/3)), # show a warning color when 2/3 of currently active receivers need change soon
+                     gaugeSectors(success = c(0, (num_deployments/3)), 
                                   warning = c((num_deployments/3), 2*(num_deployments/3)),
                                   danger = c(2*(num_deployments/3), num_deployments),
-                                  colors = c("grey", "darkgrey", "black")),
+                                  colors = c(needs_bat_change_colour, needs_bat_change_colour, needs_bat_change_colour)),
+                     abbreviateDecimals = 0)
+```
+
+### receivers that have sufficient battery life {#gauge-receiversMaintenance}
+
+```{r receivers not requiring maintenance}
+num_receivers_batteryok <- 
+  current_deployments %>%
+    dplyr::filter(needs_battery_change == 0) %>%
+    nrow()
+
+# gauge showing how many receivers don't require battery change
+flexdashboard::gauge(value = num_receivers_batteryok,
+                     href = '#table-receiverInfo',
+                     min = 0, max = num_deployments, 
+                     gaugeSectors(success = c(0, (num_deployments/3)), 
+                                  warning = c((num_deployments/3), 2*(num_deployments/3)),
+                                  danger = c(2*(num_deployments/3), num_deployments),
+                                  colors = c(battery_ok_colour, battery_ok_colour, battery_ok_colour)),
                      abbreviateDecimals = 0)
 ```
 
 
-Row {data-height=900}
+Row {data-height=920}
 ------------------------------------
 
 ### Quick info {#about-quickInfo data-width=250}
@@ -266,7 +330,7 @@ It helps to:
 
 * Get a visual overview of current receiver deployments 
 
-* plan receivers maintenance operations 
+* Plan receivers maintenance operations 
 
 
 ### Map {#about-map data-width=750}
@@ -279,17 +343,15 @@ It helps to:
 north.arrow.icon <-
   "<img src='https://www.clipartbest.com/cliparts/yTo/Lgr/yToLgryGc.png' style='width:40px;height:50px;'>"
 
-## Anchor icon for deployments
 icon_anchor <- leaflet::makeAwesomeIcon(
   icon = "anchor",
   iconColor = 'lightgray',
-  markerColor =  ifelse(current_deployments$needs_battery_change %>% is.na(), 'black', 
+  markerColor =  ifelse(current_deployments$needs_battery_change == "manual check", 'black', 
                      ifelse(current_deployments$needs_battery_change == 1, 'orange', 'darkblue')),
   library = "fa",
   squareMarker = F
   # ,spin = T
 )
-
 
 receiver_map <- 
   leaflet() %>%
@@ -306,11 +368,12 @@ receiver_map <-
                    popup = ~paste(
                            "<b>Station:</b> ", station_name, "<br>",
                            "<b>Receiver id:</b> ", receiver_id, "<br>",
+                           "<b>Deploy date:</b> ", deploy_date_time, "<br>",
                            "<b>Deployment id:</b> ", deployment_id, "<br>",
                            "<b>Battery installation:</b> ",battery_installation_date, "<br>",
                            "<b>Estimated battery end:</b> ", battery_estimated_end_date, "<br>", #
                            "<b>Receiver battery life (months):</b> ", battery_estimated_life_months, "<br>",
-                           "<b>Battery status:</b> ", ifelse(needs_battery_change %>% is.na(), "Needs manual check",
+                           "<b>Battery status:</b> ", ifelse(needs_battery_change == "manual check", "Needs manual check",
                                                              ifelse(needs_battery_change == 1, "Needs battery change", "No battery change needed"))
                            ),
                      group = "zoom to data",
@@ -318,7 +381,7 @@ receiver_map <-
                    ) %>%
   
   addLegend(position = "topright", opacity = 1,
-            colors = current_deployments$colour %>% unique(), labels = c("Needs change", "Battery is OK", "Needs manual check")) %>%
+            colors = current_deployments$colour %>% unique(), labels = c("Needs manual check", "Needs battery change", "Battery is OK")) %>%
   leafem::addMouseCoordinates() %>%
   leaflet::addScaleBar(position = "topright",
               options = scaleBarOptions(
@@ -335,26 +398,27 @@ receiver_map
 
 ```
 
-> When you hover over the map, the fields `battery_installation_date` and `battery_estimated_end_date` are displayed. By clicking on a receiver, the fields `station_name`, `receiver_id`, `deploy_latitude` and `deploy_longitude` are displayed.
+<!-- > When you hover over the map, the fields `battery_installation_date` and `battery_estimated_end_date` are displayed. By clicking on a receiver, the fields `station_name`, `receiver_id`, `deploy_latitude` and `deploy_longitude` are displayed. -->
 
-# 2. Manual Check {#deploymentsQC}
+# 2. Manual Check in ETN portal {#deploymentsQC}
 
 Row {data-height=50}
 -------------------------------------
 
 ### Deployments that need manual check {#deploymentsQC-vBox}
 
-<!-- todo: hrefs to tables -->
+<!-- todo: hrefs to tables (doesn't work...only in new tab) -->
 
 ```{r Deployments that need manual check}
 flexdashboard::valueBox(num_receivers_manualcheck,
                         href = 'https://www.lifewatch.be/etn/login',
-                        caption = "currently active deployments <br>need a manual data check in the ETN portal, <br>divided into 3 categories",
+                        caption = "currently active deployments need<br>a manual data check in the ETN portal,<br>divided into 3 categories",
+                        # "currently active deployments <br>need a manual data check in the ETN portal, <br>divided into 3 categories",
                         icon = "fa-circle-exclamation",
                         color = 'lightgray')
 ```
   
-### *Category 1:* Receivers are **lost** or deployment is not active anymore {#deploymentsQC-gauge-lost}
+### *Category 1:* **Receiver status = lost/broken**, or deployment was > `r cutoff_year_closed_deployment` years ago {#deploymentsQC-gauge-lost}
 
 ```{r Category 1}
 num_deployments_1 <- 
@@ -364,10 +428,10 @@ num_deployments_1 <-
 flexdashboard::gauge(value = num_deployments_1,
                      min = 0, max = num_receivers_manualcheck,
                      # href = '#deploymentsQC-table-lost',
-                     gaugeSectors(success = c(0, (num_receivers_manualcheck/3)), # show a warning color when 2/3 of currently active receivers need change soon
+                     gaugeSectors(success = c(0, (num_receivers_manualcheck/3)), 
                                   warning = c((num_receivers_manualcheck/3), 2*(num_receivers_manualcheck/3)),
                                   danger = c(2*(num_receivers_manualcheck/3), num_receivers_manualcheck),
-                                  colors = c("grey", "darkgrey", "black")),
+                                  colors = c(cat1_colour, cat1_colour, cat1_colour)),
                      abbreviateDecimals = 0)
 ```
 
@@ -381,10 +445,10 @@ num_deployments_2 <-
 flexdashboard::gauge(value = num_deployments_2,
                      min = 0, max = num_receivers_manualcheck, 
                      # href = '#deploymentsQC-table-noStart',
-                     gaugeSectors(success = c(0, (num_receivers_manualcheck/3)), # show a warning color when 2/3 of currently active receivers need change soon
+                     gaugeSectors(success = c(0, (num_receivers_manualcheck/3)),
                                   warning = c((num_receivers_manualcheck/3), 2*(num_receivers_manualcheck/3)),
                                   danger = c(2*(num_receivers_manualcheck/3), num_receivers_manualcheck),
-                                  colors = c("grey", "darkgrey", "black")),
+                                  colors = c(cat2_colour, cat2_colour, cat2_colour)),
                      abbreviateDecimals = 0)
 ```
 
@@ -401,55 +465,80 @@ flexdashboard::gauge(value = num_deployments_3,
                      gaugeSectors(success = c(0, (num_receivers_manualcheck/3)), # show a warning color when 2/3 of currently active receivers need change soon
                                   warning = c((num_receivers_manualcheck/3), 2*(num_receivers_manualcheck/3)),
                                   danger = c(2*(num_receivers_manualcheck/3), num_receivers_manualcheck),
-                                  colors = c("grey", "darkgrey", "black")),
+                                  colors = c(cat3_colour, cat3_colour, cat3_colour)),
                      abbreviateDecimals = 0)
 ```
 
-
+<!-- >  *Advised action:* Update the `battery_estimated_end_date` according to the `battery_installation_date` and the `battery_estimated_life`. -->
 
 Row {data-height=950}
 -------------------------------------
 
 <!-- new colours for the 3 categories: #BAD1C4, #97A9BF, and #CCB6B6 -->
 
-### Quick info {#manualCheck-quickInfo data-width=250}
+<!-- ### Quick info {#manualCheck-quickInfo data-width=250} -->
 
-**Category 1:** For `r current_deployments_1 %>% nrow()` deployments, the `deploy_date_time` was more than `r cutoff_year_closed_deployment` years ago.
+<!-- **Category 1:** For `r current_deployments_1 %>% nrow()` deployments, the `deploy_date_time` was more than `r cutoff_year_closed_deployment` years ago. -->
 
-<!-- * Advised action for the following `r current_deployments_1 %>% nrow()` deployments: **closing the deployment** and/or updating the receiver status. -->
+<!-- * Advised action for the following `r current_deployments_1 %>% nrow()` deployments: **closing the deployment** and/or updating the receiver status. --> 
 
-***
+<!-- *** -->
 
-**Category 2:** For `r current_deployments_2 %>% nrow()` deployments, the `battery_installation_date` was either not set or lies in the future.
+<!-- **Category 2:** For `r current_deployments_2 %>% nrow()` deployments, the `battery_installation_date` was either not set or lies in the future. -->
 
-*Advised action:* Update the `battery_installation_date` from the previous deployment, if given there. For `mooring_type == 'surface-buoy'`, the batteries do not get taken out when there is still some battery life left, and the batteries always get replaced with fresh ones.
+<!-- *Advised action:* Update the `battery_installation_date` from the previous deployment, if given there. For `mooring_type == 'surface-buoy'`, the batteries do not get taken out when there is still some battery life left, and the batteries always get replaced with fresh ones. -->
 
-***
+<!-- *** -->
 
-**Category 3:** For `r current_deployments_3 %>% nrow()` deployments, the `battery_estimated_end_date` is missing or lies in the past.
+<!-- **<span style=color:#BAD1C4>Category 3:</span>** For `r current_deployments_3 %>% nrow()` deployments, the `battery_estimated_end_date` is missing or lies in the past. -->
 
-*Advised action:* Update the `battery_estimated_end_date` according to the `battery_installation_date` and the `battery_estimated_life`.
+<!-- *Advised action:* Update the `battery_estimated_end_date` according to the `battery_installation_date` and the `battery_estimated_life`. -->
 
 
-### Table with details about deployments that require manual checking in the ETN portal {data-width=750}
+### Details about deployments that require manual checking in the ETN portal {data-width=750}
+
+```{css tableheight}
+<style>
+.dataTables_scrollBody {
+    max-height: 100% !important;
+}
+</style>
+```
+
 
 ```{r table QCall}
 DT::datatable(current_deployments_manual_check %>%
-              dplyr::select(deployment_id, receiver_id, status, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
-                            comments, deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time, previous_recover_date_time, battery_estimated_life_months),
+              dplyr::select(category, deployment_id, receiver_id, status, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+                            comments, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time, previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
               filter = 'top', 
               extension = 'Buttons',
               options = list(
                 dom = 'Bfrtip',
-                buttons = c('pdf', 'csv', 'excel', 'print','copy'),
+                buttons = list('copy', 'print', list(extend = 'collection',
+                                                     buttons = c('csv', 'excel', 'pdf'),
+                                                     text = 'Download')),
+                # buttons = list('copy', 'csv', 'excel', 'pdf', 'print'),
+                # order = c('bottom'),
+
+              # options = list(
+              #   dom = 'Bfrtip',
+              #   buttons = c('pdf', 'csv', 'excel', 'print','copy'),
+              
                 pageLength = current_deployments_1 %>% nrow(),
-                autoWidth = TRUE, 
+                autoWidth = TRUE,
                 columnDefs = list(list(className = 'dt-center', targets = '_all')))
               ) %>%
   formatStyle(
   c('receiver_id', 'battery_estimated_end_date'),
-  fontWeight = "bold")
+  fontWeight = "bold") %>%
+  formatStyle(
+    columns = 'category',
+    color = styleEqual(c(1, 2, 3), c('white', 'white', 'white')),
+    backgroundColor = styleEqual(c(1, 2, 3), c(cat1_colour, cat2_colour, cat3_colour)),
+    # target = 'column',
+    selector = 'td'
+  )
 
 ```
 
@@ -512,11 +601,11 @@ DT::datatable(current_deployments_manual_check %>%
 <!--               ) -->
 <!-- ``` -->
 
-> To aid with manual data entry in the ETN portal, information on the previous deployment is given: Deployment and recover dates, the battery installation and estimated end dates.
+> To aid with manual data entry in the ETN portal, information on the previous deployment is given.
 
 # 3. Plan Receiver Maintenance {#table-receiverInfo}
 
-Row {data-height=100}
+Row {data-height=80}
 ------------------------------------
 
 ### {#etn-logo data-width=150}
@@ -549,9 +638,10 @@ include_graphics("https://europeantrackingnetwork.org/sites/europeantrackingnetw
 num_deployments <- current_deployments %>% nrow()
 
 flexdashboard::valueBox(num_deployments,
+                        href = '#about-map',
                         caption = "receivers are currently deployed",
                         icon = "fa-anchor",
-                        color = 'lightgray')
+                        color = '#AAD3DF')
 ```
 
 ### deployments that need manual check {#gauge-receiversneedQC}
@@ -564,14 +654,14 @@ num_receivers_manualcheck <-
 flexdashboard::gauge(value = num_receivers_manualcheck,
                      href = '#deploymentsQC',
                      min = 0, max = num_deployments, 
-                     gaugeSectors(success = c(0, (num_deployments/3)), # show a warning color when 2/3 of currently active receivers need change soon
+                     gaugeSectors(success = c(0, (num_deployments/3)),
                                   warning = c((num_deployments/3), 2*(num_deployments/3)),
                                   danger = c(2*(num_deployments/3), num_deployments),
-                                  colors = c("grey", "darkgrey", "black")),
+                                  colors = c(needs_manual_check_colour, needs_manual_check_colour, needs_manual_check_colour)),
                      abbreviateDecimals = 0)
 ```
 
-### receivers requiring maintenance {#gauge-receiversMaintenance}
+### receivers that need new batteries {#gauge-receiversMaintenance}
 
 ```{r receivers requiring maintenance2}
 num_receivers_batterychange <- 
@@ -583,20 +673,38 @@ num_receivers_batterychange <-
 flexdashboard::gauge(value = num_receivers_batterychange,
                      href = '#table-receiverInfo',
                      min = 0, max = num_deployments, 
-                     gaugeSectors(success = c(0, (num_deployments/3)), # show a warning color when 2/3 of currently active receivers need change soon
+                     gaugeSectors(success = c(0, (num_deployments/3)), 
                                   warning = c((num_deployments/3), 2*(num_deployments/3)),
                                   danger = c(2*(num_deployments/3), num_deployments),
-                                  colors = c("grey", "darkgrey", "black")),
+                                  colors = c(needs_bat_change_colour, needs_bat_change_colour, needs_bat_change_colour)),
                      abbreviateDecimals = 0)
 ```
 
+### receivers that have sufficient battery life {#gauge-receiversMaintenance}
 
-Row {data-height=900}
+```{r receivers not requiring maintenance2}
+num_receivers_batteryok <- 
+  current_deployments %>%
+    dplyr::filter(needs_battery_change == 0) %>%
+    nrow()
+
+# gauge showing how many receivers don't require battery change
+flexdashboard::gauge(value = num_receivers_batteryok,
+                     href = '#table-receiverInfo',
+                     min = 0, max = num_deployments, 
+                     gaugeSectors(success = c(0, (num_deployments/3)), 
+                                  warning = c((num_deployments/3), 2*(num_deployments/3)),
+                                  danger = c(2*(num_deployments/3), num_deployments),
+                                  colors = c(battery_ok_colour, battery_ok_colour, battery_ok_colour)),
+                     abbreviateDecimals = 0)
+```
+
+Row {data-height=920}
 ------------------------------------
 
 ### Information on currently active deployments with receiver battery status
 
-```{css tableheight}
+```{css tableheight1}
 <style>
 .dataTables_scrollBody {
     max-height: 100% !important;
@@ -609,8 +717,8 @@ Row {data-height=900}
 ```{r receiver dt, include=TRUE, echo=FALSE}
 
 DT::datatable(current_deployments %>%
-              dplyr::select(deployment_id, receiver_id,, needs_battery_change, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
-                            comments, deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time,
+              dplyr::select(deployment_id, receiver_id, needs_battery_change, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+                            deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, comments, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time,
                             previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
               filter = 'top', 
@@ -618,7 +726,9 @@ DT::datatable(current_deployments %>%
               options = list(
                 pageLength = current_deployments %>% nrow(),
                 dom = 'Bfrtip',
-                buttons = c('pdf', 'csv', 'excel', 'print','copy'),
+                buttons = list('copy', 'print', list(extend = 'collection',
+                                                     buttons = c('csv', 'excel', 'pdf'),
+                                                     text = 'Download')),
                 pageLength = current_deployments %>% nrow(),
                 autoWidth = TRUE, columnDefs = list(list(className = 'dt-center', targets = '_all')))
               ) %>%
@@ -627,7 +737,7 @@ DT::datatable(current_deployments %>%
   fontWeight = "bold") %>%
   formatStyle(
   'needs_battery_change',
-  color = styleEqual(c(1, 0), c('black', 'white')),
-  backgroundColor = styleEqual(c(0, 1, NA), c('#00639E', 'orange', '#303030')))
+  color = styleEqual(c(1, 0, "manual check"), c('white', 'white', 'white')),
+  backgroundColor = styleEqual(c(0, 1, "manual check"), c(battery_ok_colour, needs_bat_change_colour, needs_manual_check_colour)))
 
 ```
