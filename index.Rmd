@@ -57,6 +57,10 @@ BPNS <- mregions2::gaz_search(3293) %>% mregions2::gaz_geometry()
 
 <!-- ``` -->
 
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=0.6">
+</head>
+
 
 <!-- <style type="text/css"> -->
 <!--   li {font-size: 10px;} -->
@@ -118,10 +122,18 @@ last_deployments <-
 ```{r data cleaning, include=FALSE}
 
 # new column to indicate if battery needs to be changed
+# change multiple columns to factor so that you can select the factors in the dashboard datatable
+
+# List of column names you want to convert to factors
+columns_to_factor <- c("deployment_id", "receiver_id", "acoustic_project_code", "station_name", "receiver_model", "receiver_serial_number", "manufacturer", "financing_project", "previous_deployment_id", "previous_recover_date_time", "previous_deploy_date_time", "previous_battery_estimated_end_date", "previous_battery_installation_date", "deploy_date_time", "battery_installation_date", "battery_estimated_end_date")
+
+# # Apply factor() to selected columns using mutate_at
+# your_dataframe <- your_dataframe %>%
+#   mutate_at(vars(columns_to_factor), factor)
 
 current_deployments <- 
   current_deployments %>%
-    dplyr::mutate(needs_battery_change = NA,
+    dplyr::mutate(needs_battery_change = "manual check",
                   colour = NA) %>%
     dplyr::select(!starts_with(c("ar", "log", "sync"))) %>%
     dplyr::left_join(current_receivers %>% # add information about the acoustic receivers into the deployment table
@@ -131,9 +143,7 @@ current_deployments <-
                      by = join_by(receiver_id)) %>%
     dplyr::mutate(across(where(is.POSIXct), ~ format(., "%Y-%m-%d")),
                   battery_estimated_life_months = battery_estimated_life %>% as.integer(),
-                  battery_estimated_life_months = (battery_estimated_life_months / 30) %>% round(digits = 0),
-                  deployment_id = deployment_id %>% factor()
-                  ) #change all date formats to show only year-month-day
+                  battery_estimated_life_months = (battery_estimated_life_months / 30) %>% round(digits = 0))  #change all date formats to show only year-month-day
 
 ```
 
@@ -196,25 +206,24 @@ current_deployments_manual_check <-
                                     ifelse(deployment_id %in% current_deployments_2$deployment_id, 2, 3)) %>%
                     factor(),
                   colour = ifelse(category == 1, cat1_colour,
-                                    ifelse(category == 2, cat2_colour, cat3_colour)))
+                                    ifelse(category == 2, cat2_colour, cat3_colour)),
+                  across(-c(deploy_latitude, deploy_longitude), as.factor)) #make all columns factors so they can be selected in the dashboard tables)
 
 
   
 # quick and dirty algorithm
   
 cutoff_date <- Sys.Date() + months(months_to_maintenance)
-  
+
 current_deployments <- current_deployments %>%
   dplyr::mutate(needs_battery_change = ifelse(battery_estimated_end_date < cutoff_date, 
                                               1, 
                                               0),
+                needs_battery_change = ifelse(needs_battery_change %>% is.na(), "manual check", needs_battery_change),
                 colour = ifelse(needs_battery_change == 1, 
                                 needs_bat_change_colour,
-                                battery_ok_colour),
-                colour = colour %>% tidyr::replace_na(needs_manual_check_colour),
-                needs_battery_change = ifelse(needs_battery_change %>% is.na(), "manual check", needs_battery_change)) %>% 
-  # dplyr::mutate(needs_battery_change = needs_battery_change %>% tidyr::replace_na(2)) %>%
-  # dplyr::mutate( %>% #tidyr::replace_na(2)) %>%
+                                ifelse(needs_battery_change == "manual check", needs_manual_check_colour, battery_ok_colour)),
+                across(-c(deploy_latitude, deploy_longitude), as.factor)) %>% #make all columns factors so they can be selected in the dashboard tables
   dplyr::arrange(desc(needs_battery_change))
 
 ```
@@ -330,7 +339,7 @@ It helps to:
 
 * Get a visual overview of current receiver deployments 
 
-* Plan receivers maintenance operations 
+* Plan receiver maintenance campaigns 
 
 
 ### Map {#about-map data-width=750}
