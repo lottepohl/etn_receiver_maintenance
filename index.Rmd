@@ -96,7 +96,7 @@ BPNS <- mregions2::gaz_search(3293) %>% mregions2::gaz_geometry()
 
 # get currently active deployments
 current_deployments <- etn::get_acoustic_deployments(con, 
-                                                  acoustic_project_code = "bpns", # c("ws1", "ws2")
+                                                  acoustic_project_code = c("bpns", "ws1", "ws2"),
                                                   open_only = TRUE) 
 
 # get information on receivers currently deployed
