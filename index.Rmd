@@ -46,6 +46,8 @@ con <- etn::connect_to_etn(Sys.getenv("userid"), Sys.getenv("pwd"))
 # boundaries of the belgian part of the north sea (BPNS)
 
 BPNS <- mregions2::gaz_search(3293) %>% mregions2::gaz_geometry()
+Belgium <- mregions2::gaz_search(14) %>% mregions2::gaz_geometry()
+Schelde_estuary <- mregions2::gaz_search(4812) %>% mregions2::gaz_geometry()
 
 ```
 
@@ -94,10 +96,51 @@ BPNS <- mregions2::gaz_search(3293) %>% mregions2::gaz_geometry()
 
 ```{r query etn data, include=FALSE}
 
+# TODO: get stations inside bpns and get open deployments of those and rerun code
+
+# GET STATIONS WITHIN PBARN
+
+PBARN_acoustic_projects <- c()
+# c("ws1", "ws2", "cpodnetwork", "bpns", 'zeeschelde', "bovenschelde", "dijle", "Dijle_VPS", "Albertkanaal_VPS_Ham", "Albertkanaal_VPS_Hasselt", "albert", "	Walloneel")
+
+# acoustic deployments
+
+all_deployments <- 
+  etn::get_acoustic_deployments(con, open_only = T) %>%
+    dplyr::filter(!is.na(deploy_longitude) & !is.na(deploy_latitude)) %>%
+    sf::st_as_sf(., coords = c("deploy_longitude", "deploy_latitude"), crs = 4326)
+
+
+within_BPNS <- sf::st_within(all_deployments, BPNS) %>% # get back list with TRUE or FALSE if deployment location is within BPNS boundaries
+  apply(., 1, any)
+within_Belgium <-  sf::st_within(all_deployments, Belgium) %>% # get back list with TRUE or FALSE if deployment location is within Belgium's boundaries
+  apply(., 1, any)
+within_Schelde_estuary <- sf::st_within(all_deployments, Schelde_estuary) %>% # get back list with TRUE or FALSE if deployment location is within the Scheldt estuary's boundaries
+  apply(., 1, any) 
+
+
+deployments_PBARN <- all_deployments %>%
+  dplyr::mutate(within_BPNS = within_BPNS,
+                within_Belgium = within_Belgium) %>%
+  dplyr::filter(within_BPNS == TRUE | within_BPNS == TRUE | within_Schelde_estuary == TRUE| acoustic_project_code %in% PBARN_acoustic_projects) # filter out stations that are not in any of the boundaries defined
+
+stations_PBARN <- 
+  deployments_PBARN %>% 
+    dplyr::select(station_name) %>%
+    unique() # get the station names
+
+# quick map to check
+# leaflet::leaflet() %>%
+#   addTiles() %>%
+#   addPolygons(data = Belgium, fillOpacity = 0, color = 'grey') %>%
+#   addPolygons(data = BPNS, fillOpacity = 0, color = 'grey') %>%
+#   addPolygons(data = Schelde_estuary, fillOpacity = 0, color = 'grey') %>%
+#   addCircleMarkers(data = stations_PBARN)
+
+
+#########
 # get currently active deployments
-current_deployments <- etn::get_acoustic_deployments(con, 
-                                                  acoustic_project_code = c("bpns", "ws1", "ws2"),
-                                                  open_only = TRUE) 
+current_deployments <- etn::get_acoustic_deployments(con, deployment_id = deployments_PBARN$deployment_id) 
 
 # get information on receivers currently deployed
 current_receivers <- etn::get_acoustic_receivers(con, receiver_id = current_deployments$receiver_id)
@@ -331,9 +374,9 @@ Row {data-height=920}
 ### Quick info {#about-quickInfo data-width=250}
 
 
-This dashboard gives an overview on acoustic deployments in a specific acoustic project.
+This dashboard gives an overview on all open acoustic deployments within the boundaries of the Belgian Part of the North Sea. It is effective as of `r Sys.Date()`.
 
-It helps to:
+The dashboard helps to:
 
 * Identify deployments that require manual checking in the ETN portal
 
@@ -376,6 +419,7 @@ receiver_map <-
                    lng = ~deploy_longitude,
                    popup = ~paste(
                            "<b>Station:</b> ", station_name, "<br>",
+                           "<b>Project:</b> ", acoustic_project_code, "<br>",
                            "<b>Receiver id:</b> ", receiver_id, "<br>",
                            "<b>Deploy date:</b> ", deploy_date_time, "<br>",
                            "<b>Deployment id:</b> ", deployment_id, "<br>",
@@ -517,7 +561,7 @@ Row {data-height=950}
 
 ```{r table QCall}
 DT::datatable(current_deployments_manual_check %>%
-              dplyr::select(category, deployment_id, receiver_id, status, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+              dplyr::select(category, deployment_id, acoustic_project_code, receiver_id, status, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
                             comments, acoustic_project_code, mooring_type, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time, previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
               filter = 'top', 
@@ -726,7 +770,7 @@ Row {data-height=920}
 ```{r receiver dt, include=TRUE, echo=FALSE}
 
 DT::datatable(current_deployments %>%
-              dplyr::select(deployment_id, receiver_id, needs_battery_change, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
+              dplyr::select(deployment_id, receiver_id, acoustic_project_code, needs_battery_change, station_name, battery_installation_date, battery_estimated_end_date, deploy_date_time, 
                             deploy_latitude, deploy_longitude, acoustic_project_code, mooring_type, comments, previous_deployment_id, previous_battery_installation_date, previous_deploy_date_time,
                             previous_recover_date_time, battery_estimated_life_months),
               rownames = F,
