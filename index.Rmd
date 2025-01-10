@@ -405,6 +405,10 @@ icon_anchor <- leaflet::makeAwesomeIcon(
   # ,spin = T
 )
 
+library(leaflet)
+library(leafem)
+library(leaflet.extras)
+
 receiver_map <- 
   leaflet() %>%
   addTiles() %>%
@@ -444,7 +448,8 @@ receiver_map <-
               position = "topleft",
               className = "fieldset {border: 0;}") %>%
   leafem::addHomeButton(group = "zoom to data",
-                        position = "topleft")
+                        position = "topleft") %>%
+  leaflet.extras::addFullscreenControl()
 
 receiver_map
 
