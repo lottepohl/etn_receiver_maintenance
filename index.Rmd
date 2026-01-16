@@ -279,26 +279,31 @@ Row {data-height=80}
 
 ### {#etn-logo data-width=150}
 
+```{r ETN logo, out.width="100%"}
+knitr::include_graphics("images/etn_logo.png")
 
-```{r ETN logo}
-
-include_graphics("https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png") 
-
-# # Image URL
-# image_url <- "https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png"
-# 
-# # Hyperlink URL
-# hyperlink_url <- "https://europeantrackingnetwork.org/en"
-# 
-# # Combine image and hyperlink within an HTML block
-# html_block <- div(
-#   # img(src = image_url, style = "width:70%; height:50%;"),
-#   a(href = hyperlink_url, target = "_blank", "ETN website")
-# )
-# 
-# # Display the HTML block
-# html_block
 ```
+
+
+<!-- ```{r ETN logo} -->
+
+<!-- include_graphics("https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png")  -->
+
+<!-- # # Image URL -->
+<!-- # image_url <- "https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png" -->
+<!-- #  -->
+<!-- # # Hyperlink URL -->
+<!-- # hyperlink_url <- "https://europeantrackingnetwork.org/en" -->
+<!-- #  -->
+<!-- # # Combine image and hyperlink within an HTML block -->
+<!-- # html_block <- div( -->
+<!-- #   # img(src = image_url, style = "width:70%; height:50%;"), -->
+<!-- #   a(href = hyperlink_url, target = "_blank", "ETN website") -->
+<!-- # ) -->
+<!-- #  -->
+<!-- # # Display the HTML block -->
+<!-- # html_block -->
+<!-- ``` -->
 
 
 ### active deployments {#vBox-active-deployments}
@@ -371,21 +376,30 @@ flexdashboard::gauge(value = num_receivers_batteryok,
 Row {data-height=920}
 ------------------------------------
 
-### Quick info {#about-quickInfo data-width=250}
+### Quick info {#about-quickInfo data-width=350}
+
+Dashboard effective as of **`r Sys.Date()`**
 
 
-This dashboard gives an overview on all open acoustic deployments within the boundaries of the Belgian Part of the North Sea. It is effective as of `r Sys.Date()`.
-
-The dashboard helps to:
-
-* Identify deployments that require manual checking in the ETN portal
-
-* Get a visual overview of current receiver deployments 
-
-* Plan receiver maintenance campaigns 
+***
 
 
-### Map {#about-map data-width=750}
+This dashboard gives an overview on open acoustic deployments within these acoustic project codes: 
+*`r current_deployments$acoustic_project_code %>% unique()`*
+
+***
+
+**What do the colors on the map mean?**
+
+* **<span style="color: `r battery_ok_colour`;">Blue</span>**: Battery and metadata are OK
+
+* **<span style="color: `r needs_bat_change_colour`;">Orange</span>**: Battery is estimated to end in the next `r months_to_maintenance` months
+
+* **<span style="color: `r needs_manual_check_colour`;">Black</span>**: Deployment metadata are not ok -> more info in Tab *2. Manual check in ETN portal*
+
+
+
+### Map {#about-map data-width=650}
 
 
 ```{r receiver map, out.width="100%", fig.align = 'center', echo=FALSE}
@@ -423,6 +437,7 @@ receiver_map <-
                    lng = ~deploy_longitude,
                    popup = ~paste(
                            "<b>Station:</b> ", station_name, "<br>",
+                           "<b>Type:</b> ", mooring_type, "<br>",
                            "<b>Project:</b> ", acoustic_project_code, "<br>",
                            "<b>Receiver id:</b> ", receiver_id, "<br>",
                            "<b>Deploy date:</b> ", deploy_date_time, "<br>",
@@ -668,26 +683,32 @@ Row {data-height=80}
 
 ### {#etn-logo data-width=150}
 
+```{r ETN logo2, out.width="100%"}
+knitr::include_graphics("images/etn_logo.png")
 
-```{r ETN logo2}
-
-include_graphics("https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png") 
-
-# # Image URL
-# image_url <- "https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png"
-# 
-# # Hyperlink URL
-# hyperlink_url <- "https://europeantrackingnetwork.org/en"
-# 
-# # Combine image and hyperlink within an HTML block
-# html_block <- div(
-#   # img(src = image_url, style = "width:70%; height:50%;"),
-#   a(href = hyperlink_url, target = "_blank", "ETN website")
-# )
-# 
-# # Display the HTML block
-# html_block
 ```
+
+
+
+<!-- ```{r ETN logo2} -->
+
+<!-- include_graphics("https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png")  -->
+
+<!-- # # Image URL -->
+<!-- # image_url <- "https://europeantrackingnetwork.org/sites/europeantrackingnetwork.org/files/managed/logo_ETN.png" -->
+<!-- #  -->
+<!-- # # Hyperlink URL -->
+<!-- # hyperlink_url <- "https://europeantrackingnetwork.org/en" -->
+<!-- #  -->
+<!-- # # Combine image and hyperlink within an HTML block -->
+<!-- # html_block <- div( -->
+<!-- #   # img(src = image_url, style = "width:70%; height:50%;"), -->
+<!-- #   a(href = hyperlink_url, target = "_blank", "ETN website") -->
+<!-- # ) -->
+<!-- #  -->
+<!-- # # Display the HTML block -->
+<!-- # html_block -->
+<!-- ``` -->
 
 
 ### active deployments {#vBox-active-deployments}
