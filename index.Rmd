@@ -49,6 +49,15 @@ BPNS <- mregions2::gaz_search(3293) %>% mregions2::gaz_geometry()
 Belgium <- mregions2::gaz_search(14) %>% mregions2::gaz_geometry()
 Schelde_estuary <- mregions2::gaz_search(4812) %>% mregions2::gaz_geometry()
 
+# 
+# BTN_lost_anim <- etn::get_animals(animal_project_code = "BTN_LOST")
+# skate_det2 <- etn::get_acoustic_detections(animal_project_code = "2018_FLAPPERSKATE")
+# library(dplyr)
+# 
+#  fs_ani <- etn::get_animals(animal_project_code = "2018_flapperskate") %>%
+#    dplyr::arrange(release_date_time)
+#  # get detections
+# fs_det <- etn::get_acoustic_detections(animal_project_code = "2018_flapperskate")
 ```
 
 
